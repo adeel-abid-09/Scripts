@@ -1,0 +1,310 @@
+-- [[ BUILD A HOUSE - AUTOMATION HUB ]] --
+-- UI Library: Rayfield
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Build a House | Auto Hub",
+   LoadingTitle = "Loading Automation Engine...",
+   LoadingSubtitle = "by AI Script Master",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "BuildAHouseConfig",
+      FileName = "Settings"
+   },
+   Discord = {
+      Enabled = false
+   },
+   KeySystem = false
+})
+
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- State Settings
+local Settings = {
+    -- Main / Build
+    FullAutoBuild = false,
+    SmartBuild = false,
+    AutoPlaceNearest = false,
+    SmartRefill = false,
+    
+    -- Tuning
+    TweenSpeed = 60,
+    ArrivalDistance = 4,
+    BuildDelay = 100, -- ms
+    PickupDelay = 110, -- ms
+    
+    -- Materials
+    AutoGetMaterials = false,
+    AutoFillCarry = false,
+    SelectedMaterialType = "All",
+    
+    -- Abilities
+    AutoAbilities = false,
+    SmartRotation = false,
+    
+    -- Upgrades
+    AutoUpgradeAbilities = false,
+    AutoUpgradePowerups = false,
+    UpgradeCheckDelay = 800,
+    
+    -- Misc
+    AutoReturnLobby = false
+}
+
+-- Utility: Smooth Tween Movement
+local function TweenToPosition(targetCFrame)
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local root = character.HumanoidRootPart
+    
+    local distance = (root.Position - targetCFrame.Position).Magnitude
+    local timeToTravel = distance / math.max(Settings.TweenSpeed, 10)
+    
+    local tweenInfo = TweenInfo.new(timeToTravel, Enum.EasingStyle.Linear)
+    local tween = TweenService:Create(root, tweenInfo, {CFrame = targetCFrame})
+    tween:Play()
+    tween.Completed:Wait()
+end
+
+-- ==================== TAB 1: MAIN & AUTO BUILD ==================== --
+local MainTab = Window:CreateTab("Build & Main", 4483362458)
+
+MainTab:CreateSection("Auto Build Automation")
+
+MainTab:CreateToggle({
+   Name = "Full Auto Build House",
+   CurrentValue = false,
+   Flag = "FullAutoBuild",
+   Callback = function(Value)
+       Settings.FullAutoBuild = Value
+       if Value then
+           task.spawn(function()
+               while Settings.FullAutoBuild do
+                   -- Auto Build Flow
+                   pcall(function()
+                       -- Scan workspace for build points/plots belonging to player
+                       local plots = workspace:FindFirstChild("Plots") or workspace:FindFirstChild("Houses")
+                       if plots then
+                           for _, part in ipairs(plots:GetDescendants()) do
+                               if not Settings.FullAutoBuild then break end
+                               if part:IsA("ProximityPrompt") or part.Name:lower():find("build") then
+                                   fireproximityprompt(part)
+                                   task.wait(Settings.BuildDelay / 1000)
+                               end
+                           end
+                       end
+                   end)
+                   task.wait(0.2)
+               end
+           end)
+       end
+   end,
+})
+
+MainTab:CreateToggle({
+   Name = "Smart Build & Nearest Placement",
+   CurrentValue = false,
+   Flag = "SmartBuild",
+   Callback = function(Value)
+       Settings.SmartBuild = Value
+   end,
+})
+
+MainTab:CreateToggle({
+   Name = "Smart Refill Carry",
+   CurrentValue = false,
+   Flag = "SmartRefill",
+   Callback = function(Value)
+       Settings.SmartRefill = Value
+   end,
+})
+
+-- ==================== TAB 2: MATERIALS ==================== --
+local MatTab = Window:CreateTab("Materials", 4483362458)
+
+MatTab:CreateSection("Automatic Gathering")
+
+MatTab:CreateToggle({
+   Name = "Auto Get Materials",
+   CurrentValue = false,
+   Flag = "AutoGetMaterials",
+   Callback = function(Value)
+       Settings.AutoGetMaterials = Value
+       if Value then
+           task.spawn(function()
+               while Settings.AutoGetMaterials do
+                   pcall(function()
+                       -- Look for material Dispensers / Drops
+                       local mats = workspace:FindFirstChild("Materials") or workspace:FindFirstChild("Dispensers")
+                       if mats then
+                           for _, dispenser in ipairs(mats:GetDescendants()) do
+                               if not Settings.AutoGetMaterials then break end
+                               if dispenser:IsA("ProximityPrompt") or dispenser.Name:lower():find("pickup") then
+                                   fireproximityprompt(dispenser)
+                                   task.wait(Settings.PickupDelay / 1000)
+                               end
+                           end
+                       end
+                   end)
+                   task.wait(0.3)
+               end
+           end)
+       end
+   end,
+})
+
+MatTab:CreateToggle({
+   Name = "Auto Fill Carry Capacity",
+   CurrentValue = false,
+   Flag = "AutoFillCarry",
+   Callback = function(Value)
+       Settings.AutoFillCarry = Value
+   end,
+})
+
+MatTab:CreateDropdown({
+   Name = "Target Material Type",
+   Options = {"All", "Grass", "Foundations", "Bricks", "Floors", "Misc", "Roof", "Furniture"},
+   CurrentOption = {"All"},
+   MultipleOptions = false,
+   Flag = "MatDropdown",
+   Callback = function(Option)
+       Settings.SelectedMaterialType = Option[1]
+   end,
+})
+
+-- ==================== TAB 3: TUNING & DELAYS ==================== --
+local TuningTab = Window:CreateTab("Tuning", 4483362458)
+
+TuningTab:CreateSection("Speed & Delays")
+
+TuningTab:CreateSlider({
+   Name = "Tween Speed",
+   Range = {30, 120},
+   Increment = 5,
+   Suffix = "studs/s",
+   CurrentValue = 60,
+   Flag = "TweenSpeed",
+   Callback = function(Value)
+       Settings.TweenSpeed = Value
+   end,
+})
+
+TuningTab:CreateSlider({
+   Name = "Arrival Distance",
+   Range = {2, 8},
+   Increment = 1,
+   Suffix = "studs",
+   CurrentValue = 4,
+   Flag = "ArrivalDistance",
+   Callback = function(Value)
+       Settings.ArrivalDistance = Value
+   end,
+})
+
+TuningTab:CreateSlider({
+   Name = "Build Delay (ms)",
+   Range = {85, 300},
+   Increment = 5,
+   Suffix = "ms",
+   CurrentValue = 100,
+   Flag = "BuildDelay",
+   Callback = function(Value)
+       Settings.BuildDelay = Value
+   end,
+})
+
+TuningTab:CreateSlider({
+   Name = "Pickup Delay (ms)",
+   Range = {100, 320},
+   Increment = 5,
+   Suffix = "ms",
+   CurrentValue = 110,
+   Flag = "PickupDelay",
+   Callback = function(Value)
+       Settings.PickupDelay = Value
+   end,
+})
+
+-- ==================== TAB 4: ABILITIES & UPGRADES ==================== --
+local UpgradeTab = Window:CreateTab("Abilities & Upgrades", 4483362458)
+
+UpgradeTab:CreateSection("Abilities")
+
+UpgradeTab:CreateToggle({
+   Name = "Auto Use All Abilities",
+   CurrentValue = false,
+   Flag = "AutoAbilities",
+   Callback = function(Value)
+       Settings.AutoAbilities = Value
+       if Value then
+           task.spawn(function()
+               while Settings.AutoAbilities do
+                   pcall(function()
+                       -- Trigger abilities via Remotes
+                       local remotes = ReplicatedStorage:FindFirstChild("Remotes") or ReplicatedStorage:FindFirstChild("Events")
+                       if remotes then
+                           for _, remote in ipairs(remotes:GetChildren()) do
+                               if remote:IsA("RemoteEvent") and remote.Name:lower():find("ability") then
+                                   remote:FireServer()
+                               end
+                           end
+                       end
+                   end)
+                   task.wait(2)
+               end
+           end)
+       end
+   end,
+})
+
+UpgradeTab:CreateSection("Automatic Upgrades")
+
+UpgradeTab:CreateToggle({
+   Name = "Auto Upgrade Abilities",
+   CurrentValue = false,
+   Flag = "AutoUpAbilities",
+   Callback = function(Value)
+       Settings.AutoUpgradeAbilities = Value
+   end,
+})
+
+UpgradeTab:CreateToggle({
+   Name = "Auto Upgrade Powerups (Carry/Speed)",
+   CurrentValue = false,
+   Flag = "AutoUpPowerups",
+   Callback = function(Value)
+       Settings.AutoUpgradePowerups = Value
+       if Value then
+           task.spawn(function()
+               while Settings.AutoUpgradePowerups do
+                   pcall(function()
+                       local remotes = ReplicatedStorage:FindFirstChild("Remotes") or ReplicatedStorage:FindFirstChild("Events")
+                       if remotes then
+                           for _, remote in ipairs(remotes:GetChildren()) do
+                               if remote:IsA("RemoteEvent") and remote.Name:lower():find("upgrade") then
+                                   remote:FireServer("CarryLimit")
+                                   remote:FireServer("MovementSpeed")
+                               end
+                           end
+                       end
+                   end)
+                   task.wait(Settings.UpgradeCheckDelay / 1000)
+               end
+           end)
+       end
+   end,
+})
+
+-- Notification on Load
+Rayfield:Notify({
+   Title = "Build a House Injected",
+   Content = "Auto Hub loaded successfully! Press Left-Ctrl to toggle.",
+   Duration = 5,
+   Image = 4483362458,
+})
