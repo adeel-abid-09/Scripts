@@ -1,102 +1,196 @@
--- [[ BUILD A HOUSE - NATIVE ROBLOX GUI ]] --
-
+-- Delta Compatible UI Engine
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
--- Clean up old GUI if exists
-if LocalPlayer.PlayerGui:FindFirstChild("BuildHubGUI") then
-    LocalPlayer.PlayerGui.BuildHubGUI:Destroy()
+-- UI Container Safely Mounted for Delta
+local parentTarget
+if gethui then
+    parentTarget = gethui()
+elseif syn and syn.protect_gui then
+    local gui = Instance.new("ScreenGui")
+    syn.protect_gui(gui)
+    gui.Parent = game:GetService("CoreGui")
+    parentTarget = gui
+elseif game:GetService("CoreGui"):FindFirstChild("RobloxGui") then
+    parentTarget = game:GetService("CoreGui")
+else
+    parentTarget = LocalPlayer:WaitForChild("PlayerGui")
 end
 
--- Settings
-local Settings = {
-    AutoBuild = false,
-    AutoMaterials = false,
-    AutoAbilities = false,
-    AutoUpgrade = false,
-    TweenSpeed = 60,
-    BuildDelay = 0.1,
-    PickupDelay = 0.11
-}
+-- Cleanup duplicate
+if parentTarget:FindFirstChild("StandardAppUI") then
+    parentTarget.StandardAppUI:Destroy()
+end
 
--- Create ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "BuildHubGUI"
+ScreenGui.Name = "StandardAppUI"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.Parent = parentTarget
 
--- Main Frame
+-- 2. Main Window Frame
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 260, 0, 330)
-MainFrame.Position = UDim2.new(0.05, 0, 0.25, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 240, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -120, 0.4, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 22, 28)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
-MainFrame.Draggable = true -- اس کو آپ اسکرین پر کہیں بھی ہلا سکتے ہیں
 MainFrame.Parent = ScreenGui
 
-local UICorner = Instance.new("UICorner", MainFrame)
-UICorner.CornerRadius = UDim.new(0, 8)
+local FrameCorner = Instance.new("UICorner")
+FrameCorner.CornerRadius = UDim.new(0, 8)
+FrameCorner.Parent = MainFrame
 
--- Title
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-Title.Text = "🔨 Build a House Hub"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 15
-Title.Font = Enum.Font.GothamBold
-Title.Parent = MainFrame
+local FrameStroke = Instance.new("UIStroke")
+FrameStroke.Color = Color3.fromRGB(45, 48, 58)
+FrameStroke.Thickness = 1.2
+FrameStroke.Parent = MainFrame
 
-local TitleCorner = Instance.new("UICorner", Title)
-TitleCorner.CornerRadius = UDim.new(0, 8)
+-- 3. Header Panel
+local Header = Instance.new("Frame")
+Header.Name = "Header"
+Header.Size = UDim2.new(1, 0, 0, 34)
+Header.BackgroundColor3 = Color3.fromRGB(28, 30, 38)
+Header.BorderSizePixel = 0
+Header.Parent = MainFrame
 
--- Helper to make buttons
-local function CreateButton(text, yPos, callback)
+local HeaderCorner = Instance.new("UICorner")
+HeaderCorner.CornerRadius = UDim.new(0, 8)
+HeaderCorner.Parent = Header
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -20, 1, 0)
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.Text = "BUILD A HOUSE PANEL"
+TitleLabel.TextColor3 = Color3.fromRGB(0, 170, 255)
+TitleLabel.TextSize = 12
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = Header
+
+-- Dragging Functionality for Touch & Mouse
+local dragging, dragInput, dragStart, startPos
+Header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+Header.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- 4. Scroll Container for Features
+local Container = Instance.new("ScrollingFrame")
+Container.Name = "Container"
+Container.Size = UDim2.new(1, -16, 1, -44)
+Container.Position = UDim2.new(0, 8, 0, 38)
+Container.BackgroundTransparency = 1
+Container.BorderSizePixel = 0
+Container.ScrollBarThickness = 2
+Container.CanvasSize = UDim2.new(0, 0, 0, 330)
+Container.Parent = MainFrame
+
+local UIList = Instance.new("UIListLayout")
+UIList.Padding = UDim.new(0, 6)
+UIList.SortOrder = Enum.SortOrder.LayoutOrder
+UIList.Parent = Container
+
+-- Button Builder
+local function AddToggle(text, order, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 36)
-    btn.Position = UDim2.new(0.05, 0, 0, yPos)
-    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-    btn.Text = text .. ": OFF"
-    btn.TextColor3 = Color3.fromRGB(255, 100, 100)
-    btn.TextSize = 13
-    btn.Font = Enum.Font.GothamSemibold
-    btn.Parent = MainFrame
+    btn.Size = UDim2.new(1, 0, 0, 32)
+    btn.BackgroundColor3 = Color3.fromRGB(28, 30, 38)
+    btn.Text = text .. " : OFF"
+    btn.TextColor3 = Color3.fromRGB(180, 180, 190)
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextSize = 11
+    btn.LayoutOrder = order
+    btn.Parent = Container
 
-    local Corner = Instance.new("UICorner", btn)
-    Corner.CornerRadius = UDim.new(0, 6)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(45, 48, 58)
+    stroke.Thickness = 1
+    stroke.Parent = btn
 
     local state = false
     btn.MouseButton1Click:Connect(function()
         state = not state
         if state then
-            btn.BackgroundColor3 = Color3.fromRGB(40, 70, 50)
-            btn.TextColor3 = Color3.fromRGB(100, 255, 100)
-            btn.Text = text .. ": ON"
+            btn.BackgroundColor3 = Color3.fromRGB(16, 45, 30)
+            btn.TextColor3 = Color3.fromRGB(0, 255, 150)
+            btn.Text = text .. " : ON"
+            stroke.Color = Color3.fromRGB(0, 255, 150)
         else
-            btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-            btn.TextColor3 = Color3.fromRGB(255, 100, 100)
-            btn.Text = text .. ": OFF"
+            btn.BackgroundColor3 = Color3.fromRGB(28, 30, 38)
+            btn.TextColor3 = Color3.fromRGB(180, 180, 190)
+            btn.Text = text .. " : OFF"
+            stroke.Color = Color3.fromRGB(45, 48, 58)
         end
         callback(state)
     end)
-    return btn
 end
 
--- 1. Full Auto Build Toggle
-CreateButton("Full Auto Build", 45, function(state)
-    Settings.AutoBuild = state
+-- ================= FEATURES INTEGRATION ================= --
+
+-- 1. Full Auto Build
+local autoBuildActive = false
+AddToggle("Full Auto Build House", 1, function(state)
+    autoBuildActive = state
     if state then
         task.spawn(function()
-            while Settings.AutoBuild do
+            while autoBuildActive do
                 pcall(function()
-                    for _, obj in ipairs(workspace:GetDescendants()) do
-                        if not Settings.AutoBuild then break end
-                        if obj:IsA("ProximityPrompt") and (obj.ActionText:lower():find("build") or obj.ObjectText:lower():find("build") or obj.Name:lower():find("build")) then
-                            fireproximityprompt(obj)
-                            task.wait(Settings.BuildDelay)
+                    for _, v in ipairs(workspace:GetDescendants()) do
+                        if not autoBuildActive then break end
+                        if v:IsA("ProximityPrompt") and (v.ActionText:lower():find("build") or v.ObjectText:lower():find("build") or v.Name:lower():find("build")) then
+                            fireproximityprompt(v)
+                            task.wait(0.1)
+                        end
+                    end
+                end)
+                task.wait(0.15)
+            end
+        end)
+    end
+end)
+
+-- 2. Auto Get Materials
+local autoMatActive = false
+AddToggle("Auto Get Materials", 2, function(state)
+    autoMatActive = state
+    if state then
+        task.spawn(function()
+            while autoMatActive do
+                pcall(function()
+                    for _, v in ipairs(workspace:GetDescendants()) do
+                        if not autoMatActive then break end
+                        if v:IsA("ProximityPrompt") and (v.ActionText:lower():find("take") or v.ActionText:lower():find("get") or v.Name:lower():find("pickup")) then
+                            fireproximityprompt(v)
+                            task.wait(0.11)
                         end
                     end
                 end)
@@ -106,33 +200,13 @@ CreateButton("Full Auto Build", 45, function(state)
     end
 end)
 
--- 2. Auto Get Materials Toggle
-CreateButton("Auto Get Materials", 90, function(state)
-    Settings.AutoMaterials = state
+-- 3. Auto Use Abilities
+local autoAbilityActive = false
+AddToggle("Auto Use Abilities", 3, function(state)
+    autoAbilityActive = state
     if state then
         task.spawn(function()
-            while Settings.AutoMaterials do
-                pcall(function()
-                    for _, obj in ipairs(workspace:GetDescendants()) do
-                        if not Settings.AutoMaterials then break end
-                        if obj:IsA("ProximityPrompt") and (obj.ActionText:lower():find("take") or obj.ActionText:lower():find("get") or obj.Name:lower():find("pickup")) then
-                            fireproximityprompt(obj)
-                            task.wait(Settings.PickupDelay)
-                        end
-                    end
-                end)
-                task.wait(0.3)
-            end
-        end)
-    end
-end)
-
--- 3. Auto Use Abilities Toggle
-CreateButton("Auto Use Abilities", 135, function(state)
-    Settings.AutoAbilities = state
-    if state then
-        task.spawn(function()
-            while Settings.AutoAbilities do
+            while autoAbilityActive do
                 pcall(function()
                     local remotes = ReplicatedStorage:FindFirstChild("Remotes") or ReplicatedStorage:FindFirstChild("Events")
                     if remotes then
@@ -143,18 +217,19 @@ CreateButton("Auto Use Abilities", 135, function(state)
                         end
                     end
                 end)
-                task.wait(2)
+                task.wait(1.5)
             end
         end)
     end
 end)
 
--- 4. Auto Upgrades Toggle
-CreateButton("Auto Upgrade", 180, function(state)
-    Settings.AutoUpgrade = state
+-- 4. Auto Upgrade All
+local autoUpActive = false
+AddToggle("Auto Upgrade Powerups", 4, function(state)
+    autoUpActive = state
     if state then
         task.spawn(function()
-            while Settings.AutoUpgrade do
+            while autoUpActive do
                 pcall(function()
                     local remotes = ReplicatedStorage:FindFirstChild("Remotes") or ReplicatedStorage:FindFirstChild("Events")
                     if remotes then
@@ -166,58 +241,17 @@ CreateButton("Auto Upgrade", 180, function(state)
                         end
                     end
                 end)
-                task.wait(1)
+                task.wait(0.8)
             end
         end)
     end
 end)
 
--- Speed Boost Button (Direct WalkSpeed)
-local speedState = false
-local SpeedBtn = Instance.new("TextButton")
-SpeedBtn.Size = UDim2.new(0.9, 0, 0, 36)
-SpeedBtn.Position = UDim2.new(0.05, 0, 0, 225)
-SpeedBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-SpeedBtn.Text = "WalkSpeed (50): OFF"
-SpeedBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-SpeedBtn.Font = Enum.Font.GothamSemibold
-SpeedBtn.TextSize = 13
-SpeedBtn.Parent = MainFrame
-Instance.new("UICorner", SpeedBtn).CornerRadius = UDim.new(0, 6)
-
-SpeedBtn.MouseButton1Click:Connect(function()
-    speedState = not speedState
-    if speedState then
-        SpeedBtn.BackgroundColor3 = Color3.fromRGB(40, 70, 50)
-        SpeedBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
-        SpeedBtn.Text = "WalkSpeed (50): ON"
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            LocalPlayer.Character.Humanoid.WalkSpeed = 50
-        end
-    else
-        SpeedBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-        SpeedBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-        SpeedBtn.Text = "WalkSpeed (50): OFF"
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            LocalPlayer.Character.Humanoid.WalkSpeed = 16
-        end
+-- 5. Movement Boost
+local speedActive = false
+AddToggle("Boost WalkSpeed (45)", 5, function(state)
+    speedActive = state
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = state and 45 or 16
     end
 end)
-
--- Close Button
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0.9, 0, 0, 30)
-CloseBtn.Position = UDim2.new(0.05, 0, 0, 280)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-CloseBtn.Text = "Close Menu"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 12
-CloseBtn.Parent = MainFrame
-Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
-
-CloseBtn.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
-end)
-
-print("Build Hub GUI loaded successfully!")
